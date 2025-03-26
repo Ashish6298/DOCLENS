@@ -12,16 +12,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// CORS configuration
-app.use(
-  cors({
-    origin: "https://doclens.onrender.com/upload", // Replace with your frontend URL if different
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type"],
-  })
-);
-app.use(express.json());
-
 // 🛠️ Multer storage (store in memory)
 const storage = multer.memoryStorage();
 const upload = multer({ storage }).single("file");
@@ -47,32 +37,23 @@ app.post("/upload", (req, res) => {
         const pdfData = await pdfParse(req.file.buffer);
         extractedText = pdfData.text;
       } else if (req.file.mimetype.startsWith("image/")) {
-        const {
-          data: { text },
-        } = await Tesseract.recognize(req.file.buffer, "eng");
+        const { data: { text } } = await Tesseract.recognize(req.file.buffer, "eng");
         extractedText = text;
       } else {
-        return res
-          .status(400)
-          .json({ error: "Unsupported file type. Upload PDF or Image." });
+        return res.status(400).json({ error: "Unsupported file type. Upload PDF or Image." });
       }
 
       console.log("📄 Extracted Text:", extractedText);
 
       // ✅ Split text into paragraphs
-      const paragraphs = extractedText
-        .split(/\n\s*\n/)
-        .filter((p) => p.trim() !== "");
+      const paragraphs = extractedText.split(/\n\s*\n/).filter(p => p.trim() !== "");
 
       // 🔥 Summarize each paragraph separately
       const summarizedParagraphs = await summarizeParagraphs(paragraphs);
 
       res.json({ original: paragraphs, summary: summarizedParagraphs });
     } catch (error) {
-      console.error(
-        "❌ Error processing file:",
-        error.response?.data || error.message
-      );
+      console.error("❌ Error processing file:", error.response?.data || error.message);
       res.status(500).json({ error: "Failed to summarize document" });
     }
   });
@@ -98,9 +79,7 @@ async function summarizeParagraphs(paragraphs) {
           const response = await axios.post(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
             {
-              contents: [
-                { parts: [{ text: `Summarize this text:\n\n${chunk}` }] },
-              ],
+              contents: [{ parts: [{ text: `Summarize this text:\n\n${chunk}` }] }],
             },
             {
               headers: { "Content-Type": "application/json" },
@@ -108,9 +87,7 @@ async function summarizeParagraphs(paragraphs) {
             }
           );
 
-          const summary =
-            response.data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-            "No summary available";
+          const summary = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "No summary available";
           combinedSummary += summary + " ";
         }
         summaries.push(combinedSummary.trim());
@@ -118,13 +95,7 @@ async function summarizeParagraphs(paragraphs) {
         const response = await axios.post(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
           {
-            contents: [
-              {
-                parts: [
-                  { text: `Summarize this paragraph:\n\n${textToSummarize}` },
-                ],
-              },
-            ],
+            contents: [{ parts: [{ text: `Summarize this paragraph:\n\n${textToSummarize}` }] }],
           },
           {
             headers: { "Content-Type": "application/json" },
@@ -132,16 +103,11 @@ async function summarizeParagraphs(paragraphs) {
           }
         );
 
-        const summary =
-          response.data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-          "No summary available";
+        const summary = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "No summary available";
         summaries.push(summary);
       }
     } catch (error) {
-      console.error(
-        "❌ Gemini API Error:",
-        error.response?.data || error.message
-      );
+      console.error("❌ Gemini API Error:", error.response?.data || error.message);
       summaries.push("Error summarizing this paragraph");
     }
   }
