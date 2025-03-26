@@ -63,21 +63,49 @@ app.post("/upload", (req, res) => {
 async function summarizeParagraphs(paragraphs) {
   const summaries = [];
 
+  const MAX_TEXT_LENGTH = 10000;
+
   for (const para of paragraphs) {
     try {
-      const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent`,
-        {
-          contents: [{ role: "user", parts: [{ text: `Summarize this paragraph:\n\n${para}` }] }]
-        },
-        {
-          headers: { "Content-Type": "application/json" },
-          params: { key: process.env.GEMINI_API_KEY }
+      let textToSummarize = para;
+      if (textToSummarize.length > MAX_TEXT_LENGTH) {
+        const chunks = [];
+        for (let i = 0; i < textToSummarize.length; i += MAX_TEXT_LENGTH) {
+          chunks.push(textToSummarize.slice(i, i + MAX_TEXT_LENGTH));
         }
-      );
 
-      const summary = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "No summary available";
-      summaries.push(summary);
+        let combinedSummary = "";
+        for (const chunk of chunks) {
+          const response = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+            {
+              contents: [{ parts: [{ text: `Summarize this text:\n\n${chunk}` }] }],
+            },
+            {
+              headers: { "Content-Type": "application/json" },
+              params: { key: process.env.GEMINI_API_KEY },
+            }
+          );
+
+          const summary = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "No summary available";
+          combinedSummary += summary + " ";
+        }
+        summaries.push(combinedSummary.trim());
+      } else {
+        const response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+          {
+            contents: [{ parts: [{ text: `Summarize this paragraph:\n\n${textToSummarize}` }] }],
+          },
+          {
+            headers: { "Content-Type": "application/json" },
+            params: { key: process.env.GEMINI_API_KEY },
+          }
+        );
+
+        const summary = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "No summary available";
+        summaries.push(summary);
+      }
     } catch (error) {
       console.error("❌ Gemini API Error:", error.response?.data || error.message);
       summaries.push("Error summarizing this paragraph");
