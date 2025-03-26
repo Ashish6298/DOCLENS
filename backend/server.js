@@ -15,7 +15,7 @@ app.use(express.json());
 // CORS configuration
 app.use(
   cors({
-    origin: "https://doclens.onrender.com", // Replace with your frontend URL if different
+    origin: "https://doclens.onrender.com/upload", // Replace with your frontend URL if different
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type"],
   })
